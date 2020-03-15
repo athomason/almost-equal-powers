@@ -28,12 +28,13 @@ func main() {
 			fh.Close()
 		}()
 	}
+	const multiplier = 1e12
 	var (
 		two, ten         = big.NewInt(2), big.NewInt(10)
 		pTen, pTwo, diff big.Int
-		rat              big.Rat
+		invErr, bestErr  big.Int
 		log2of10         = math.Log2(10)
-		bestErr          = 1.
+		mult             = big.NewInt(multiplier)
 	)
 	pTen.Set(ten)
 	for tensExp := 1; ; tensExp++ {
@@ -41,15 +42,21 @@ func main() {
 		twosExp := float64(tensExp) * log2of10
 		lowerTwosExp := int(math.Floor(twosExp))
 		for i, twosExp := range [...]int{lowerTwosExp, lowerTwosExp + 1} {
+			// pTwo = 2**twosExp
 			if i == 0 {
 				pTwo.Exp(two, big.NewInt(int64(twosExp)), nil)
 			} else {
 				pTwo.Mul(&pTwo, two)
 			}
-			diff.Sub(&pTwo, &pTen).Abs(&diff)
-			rat.SetFrac(&diff, &pTen)
-			if e, _ := rat.Float64(); e < bestErr {
-				bestErr = e
+			diff.Sub(&pTwo, &pTen).Abs(&diff) // diff = abs(pTwo-pTen)
+			// err = diff/pTen => invErr = pTen/diff
+			invErr.Mul(&pTen, mult)
+			invErr.Div(&invErr, &diff)
+			if invErr.Cmp(&bestErr) > 0 {
+				bestErr = invErr
+				//fmt.Printf("%v-%v=%v ie=%v\n", pTwo.String(), pTen.String(),
+				//	diff.String(), invErr.String())
+				e := multiplier / float64(invErr.Int64())
 				fmt.Printf("10**%d ~ 2**%d (%.2g%%)\n", tensExp, twosExp, 100*e)
 			}
 		}
