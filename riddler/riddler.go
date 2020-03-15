@@ -13,9 +13,21 @@ import (
 	"fmt"
 	"math"
 	"math/big"
+	"os"
+	"runtime/pprof"
+	"time"
 )
 
 func main() {
+	fh, err := os.Create("riddler.pprof")
+	if err == nil {
+		pprof.StartCPUProfile(fh)
+		go func() {
+			time.Sleep(30 * time.Second)
+			pprof.StopCPUProfile()
+			fh.Close()
+		}()
+	}
 	var (
 		two, ten         = big.NewInt(2), big.NewInt(10)
 		pTen, pTwo, diff big.Int
@@ -23,18 +35,24 @@ func main() {
 		log2of10         = math.Log2(10)
 		bestErr          = 1.
 	)
+	pTen.Set(ten)
 	for tensExp := 1; ; tensExp++ {
-		pTen.Exp(ten, big.NewInt(int64(tensExp)), nil)
 		// compare the power of ten to the powers of two below and above it
-		lowerTwosExp := int(math.Floor(float64(tensExp) * log2of10))
-		for _, twosExp := range []int{lowerTwosExp, lowerTwosExp + 1} {
-			pTwo.Exp(two, big.NewInt(int64(twosExp)), nil)
+		twosExp := float64(tensExp) * log2of10
+		lowerTwosExp := int(math.Floor(twosExp))
+		for i, twosExp := range [...]int{lowerTwosExp, lowerTwosExp + 1} {
+			if i == 0 {
+				pTwo.Exp(two, big.NewInt(int64(twosExp)), nil)
+			} else {
+				pTwo.Mul(&pTwo, two)
+			}
 			diff.Sub(&pTwo, &pTen).Abs(&diff)
-			rat.SetFrac(&diff, &pTwo)
+			rat.SetFrac(&diff, &pTen)
 			if e, _ := rat.Float64(); e < bestErr {
 				bestErr = e
 				fmt.Printf("10**%d ~ 2**%d (%.2g%%)\n", tensExp, twosExp, 100*e)
 			}
 		}
+		pTen.Mul(&pTen, ten)
 	}
 }
